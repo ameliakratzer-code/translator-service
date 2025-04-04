@@ -1,34 +1,42 @@
-def translate_content(content: str) -> tuple[bool, str]:
-    if content == "这是一条中文消息":
-        return False, "This is a Chinese message"
-    if content == "Ceci est un message en français":
-        return False, "This is a French message"
-    if content == "Esta es un mensaje en español":
-        return False, "This is a Spanish message"
-    if content == "Esta é uma mensagem em português":
-        return False, "This is a Portuguese message"
-    if content  == "これは日本語のメッセージです":
-        return False, "This is a Japanese message"
-    if content == "이것은 한국어 메시지입니다":
-        return False, "This is a Korean message"
-    if content == "Dies ist eine Nachricht auf Deutsch":
-        return False, "This is a German message"
-    if content == "Questo è un messaggio in italiano":
-        return False, "This is an Italian message"
-    if content == "Это сообщение на русском":
-        return False, "This is a Russian message"
-    if content == "هذه رسالة باللغة العربية":
-        return False, "This is an Arabic message"
-    if content == "यह हिंदी में संदेश है":
-        return False, "This is a Hindi message"
-    if content == "นี่คือข้อความภาษาไทย":
-        return False, "This is a Thai message"
-    if content == "Bu bir Türkçe mesajdır":
-        return False, "This is a Turkish message"
-    if content == "Đây là một tin nhắn bằng tiếng Việt":
-        return False, "This is a Vietnamese message"
-    if content == "Esto es un mensaje en catalán":
-        return False, "This is a Catalan message"
-    if content == "This is an English message":
-        return True, "This is an English message"
-    return True, content
+import os
+from dotenv import load_dotenv
+import openai
+import ast
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Access the OpenAI API key
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+# Initialize the OpenAI client
+client = openai.OpenAI(
+    api_key=openai_api_key
+)
+
+def query_llm_robust(post: str) -> tuple[bool, str]:
+  context = "First, determine the language of the given post. If the post is written in English, return True and the original post. Next, if the post is not in English, return False and the English translation. If the post is unintelligible (e.g., contains random characters or gibberish), return False and the original post. Desired format: A tuple where (True if the post is in English and False if not, translated post or original post)."
+  response = client.chat.completions.create(
+      model="gpt-4o-mini",
+      messages=[
+          {
+            "role": "system",
+            "content": context
+          },
+          {
+              "role": "user",
+              "content": post
+          }
+      ]
+    )
+  response = response.choices[0].message.content
+  try:
+    response = response.strip("'")  # Remove outer single quotes if present
+    parsed = ast.literal_eval(response)
+    if isinstance(parsed, tuple) and len(parsed) == 2 and isinstance(parsed[0], bool) and isinstance(parsed[1], str):
+      return parsed
+    else:
+      return (False, "__LLM_ERROR__: " + post)
+  except (SyntaxError, ValueError, TypeError):
+    pass  # Handle cases where parsing fails
+  return (False, "__LLM_ERROR__: " + post)
